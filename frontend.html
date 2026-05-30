@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Aerial Segmenter | Inception-v4 U-Net</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Inter:wght@300;400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary": "#2ae500",
+                        "inverse-primary": "#00696e",
+                        "on-primary-container": "#009197",
+                        "surface": "#121317",
+                        "tertiary-fixed-dim": "#2ae500",
+                        "primary": "#00dce5",
+                        "on-background": "#e3e2e8",
+                        "secondary": "#a5d0b9",
+                        "surface-container": "#1f1f24",
+                        "primary-container": "#001e20",
+                        "surface-container-high": "#292a2e",
+                        "on-error-container": "#ffdad6",
+                        "on-secondary-fixed": "#002114",
+                        "on-primary": "#003739",
+                        "surface-container-highest": "#343439",
+                        "outline": "#8e9196",
+                        "secondary-fixed-dim": "#a5d0b9",
+                        "tertiary-fixed": "#79ff5b",
+                        "on-secondary-container": "#97c2ab",
+                        "error": "#ffb4ab",
+                        "outline-variant": "#44474c",
+                        "on-surface-variant": "#c4c6cc",
+                        "on-error": "#690005",
+                        "inverse-surface": "#e3e2e8",
+                        "on-primary-fixed": "#002021",
+                        "surface-variant": "#343439",
+                        "on-surface": "#e3e2e8",
+                        "on-tertiary": "#053900",
+                        "on-secondary": "#0e3727",
+                        "on-primary-fixed-variant": "#004f53",
+                        "on-tertiary-container": "#199800",
+                        "surface-container-low": "#1a1b20",
+                        "secondary-fixed": "#c1ecd4",
+                        "surface-tint": "#00dce5",
+                        "on-secondary-fixed-variant": "#274e3d",
+                        "inverse-on-surface": "#2f3035",
+                        "error-container": "#93000a",
+                        "surface-container-lowest": "#0d0e12",
+                        "on-tertiary-fixed-variant": "#095300",
+                        "primary-fixed": "#63f7ff",
+                        "tertiary-container": "#022000",
+                        "surface-bright": "#38393e",
+                        "primary-fixed-dim": "#00dce5",
+                        "on-tertiary-fixed": "#022100",
+                        "secondary-container": "#29513f",
+                        "surface-dim": "#121317",
+                        "background": "#121317"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Space Grotesk"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .grid-overlay {
+            background-image: linear-gradient(to right, rgba(68, 71, 76, 0.1) 1px, transparent 1px),
+                              linear-gradient(to bottom, rgba(68, 71, 76, 0.1) 1px, transparent 1px);
+            background-size: 16px 16px;
+        }
+        .glass-panel {
+            backdrop-filter: blur(12px);
+            background: rgba(31, 31, 36, 0.3);
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface font-body selection:bg-primary selection:text-on-primary">
+<!-- TopNavBar -->
+<header class="fixed top-0 left-0 w-full flex justify-between items-center px-8 h-20 bg-[#121317]/80 backdrop-blur-md z-50 shadow-[0_40px_60px_-5px_rgba(13,14,18,0.4)]">
+<div class="text-xl font-bold tracking-tighter text-[#00dce5] font-['Space_Grotesk']">AERIAL SEGMENTER</div>
+<nav class="hidden md:flex gap-8 items-center font-['Space_Grotesk'] tracking-tight">
+<a class="text-[#00dce5] border-b-2 border-[#00dce5] pb-1" href="#architecture">Architecture</a>
+<a class="text-[#c4c6cc] hover:text-[#00dce5] transition-colors" href="#pipeline">Pipeline</a>
+<a class="text-[#c4c6cc] hover:text-[#00dce5] transition-colors" href="#optimization">Optimization</a>
+<a class="text-[#c4c6cc] hover:text-[#00dce5] transition-colors" href="#demo">Demo</a>
+</nav>
+<div class="flex items-center gap-4">
+<a href="https://github.com/SaarthakG-Dtu/Aerial-Image-Segmentation" target="_blank" rel="noopener noreferrer" class="bg-gradient-to-br from-primary to-on-primary-container text-on-primary font-medium px-6 py-2 rounded-xl transition-all duration-300 ease-in-out hover:opacity-90 flex items-center gap-2">
+<span class="material-symbols-outlined text-[1.25rem]" data-icon="code">code</span>
+                View Repository
+            </a>
+</div>
+</header>
+<main class="pt-20">
+<!-- Hero Section -->
+<section class="relative min-height-[819px] flex items-center overflow-hidden py-32 px-8">
+<div class="absolute inset-0 z-0">
+<img class="w-full h-full object-cover opacity-40" data-alt="High altitude aerial view of a geometric urban cityscape with intricate road networks and industrial zones at twilight" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC5r6K8p3OVrEJNatxQIZdOK4eLDjR3xioOhDRJgVN5mMACc8-VIHgcsTmf9hlXu4DNi9uMqdJt_8u73gPNNhaLErtazbntdg8DpjOIccW8EI5OyDX30XNhbALC6A5iYhmz5aEYsmVeD0Vqe86MMOKpsRVUbv8SIzZsLDRXZQKyoufjj_fYthO1PsbLhXHJZgMfga9Lowxj5j3Hm-ARagWD138IPgENt2F9B1_WKBmbkuy87hymJ2eCaJNFxVT8ATkwLxoc_YwgxP0"/>
+<div class="absolute inset-0 bg-gradient-to-t from-surface via-surface/60 to-transparent"></div>
+<div class="absolute inset-0 grid-overlay"></div>
+</div>
+<div class="relative z-10 max-w-5xl mx-auto text-center">
+<div class="inline-flex items-center gap-2 px-3 py-1 bg-surface-container-low text-tertiary border border-tertiary/20 rounded-lg mb-8">
+<span class="w-2 h-2 bg-tertiary rounded-full"></span>
+<span class="font-label text-[0.75rem] uppercase tracking-[0.1em]">FastAPI Inference: Inception-v4 U-Net</span>
+</div>
+<h1 class="font-headline text-[3.5rem] leading-none tracking-[-0.02em] font-bold text-on-surface mb-6">
+                    Aerial Image Segmentation <br/>
+<span class="text-transparent bg-clip-text bg-gradient-to-r from-primary to-tertiary">with Transfer Learning</span>
+</h1>
+<p class="font-body text-on-surface-variant text-lg max-w-2xl mx-auto mb-10">
+                    Semantic segmentation for aerial imagery using a pretrained Inception-v4 encoder with a U-Net decoder trained on the project mask palette.
+                </p>
+<div class="flex justify-center gap-4">
+<a href="#optimization" class="px-8 py-4 bg-gradient-to-br from-primary to-on-primary-container text-on-primary font-bold rounded-xl flex items-center gap-2 transition-all hover:scale-105">
+                        Train Model <span class="material-symbols-outlined" data-icon="model_training">model_training</span>
+</a>
+<a href="#demo" class="px-8 py-4 bg-surface-container border border-primary/15 glass-panel text-primary font-bold rounded-xl flex items-center gap-2 hover:bg-surface-container-high transition-colors">
+                        Try Inference <span class="material-symbols-outlined" data-icon="visibility">visibility</span>
+</a>
+</div>
+</section>
+<!-- Model Architecture -->
+<section id="architecture" class="py-24 px-8 bg-surface-container-low">
+<div class="max-w-7xl mx-auto">
+<div class="flex flex-col md:flex-row gap-16 items-center">
+<div class="flex-1">
+<div class="label-md uppercase tracking-[0.1em] text-primary mb-4 font-label">Core Engine</div>
+<h2 class="font-headline text-[1.75rem] font-bold text-on-surface mb-8">Neural Backbone Architecture</h2>
+<div class="space-y-6">
+<div class="p-6 bg-surface-container rounded-xl">
+<h3 class="font-headline font-bold text-on-surface mb-2">U-Net with Inception-v4</h3>
+<p class="text-on-surface-variant text-sm">Leveraging the spatial context preservation of U-Net with the multi-scale feature extraction capabilities of Inception-v4 blocks.</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<div class="flex items-center gap-4 p-4 bg-surface-container rounded-xl">
+<div class="w-12 h-12 bg-primary-container rounded-xl flex items-center justify-center">
+<span class="material-symbols-outlined text-primary" data-icon="model_training">model_training</span>
+</div>
+<div>
+<div class="font-bold text-on-surface">Transfer Learning</div>
+<div class="text-[0.75rem] text-on-surface-variant uppercase tracking-wider">ImageNet Encoder</div>
+</div>
+</div>
+<div class="flex items-center gap-4 p-4 bg-surface-container rounded-xl">
+<div class="w-12 h-12 bg-tertiary-container rounded-xl flex items-center justify-center">
+<span class="material-symbols-outlined text-tertiary" data-icon="category">category</span>
+</div>
+<div>
+<div class="font-bold text-on-surface">5 Mask Classes</div>
+<div class="text-[0.75rem] text-on-surface-variant uppercase tracking-wider">Project Palette</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="flex-1 w-full">
+<div class="relative bg-surface-container-high p-8 rounded-xl aspect-square flex items-center justify-center overflow-hidden border border-outline-variant/10">
+<div class="absolute inset-0 grid-overlay opacity-30"></div>
+<img class="w-full h-full object-cover rounded-lg opacity-80 mix-blend-screen" data-alt="Abstract 3D visualization of a complex neural network node structure with cyan light paths and floating data particles" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD7zRDxuqdCZnrB0dGKt9bhJenPDd_NCquYTGS_-Zze-w6VygCUwh1eV7-VrwUqHIbIGPPzBqcaI-ggDIgqdLwxZhH_kwwIxRQi8-RjTXnwaV5K_icO6VqOTT6cLz6p9UD5glDFZtSBdpUlrAEAa2ZJmHZimny9_Qy_tOVaefOfd7mFUqYsFCgywHZoGpeD-TxUV-3axO5OwMS1BKqzU5JkEf9GYX2y9NOhlv1PEXoQFH3WgBOur8PzAvkCgIYhFigj8sUSCCYoTZQ"/>
+<div class="absolute bottom-4 right-4 bg-surface/80 backdrop-blur-md p-3 rounded-lg border border-primary/20">
+<div class="text-[0.65rem] text-primary uppercase font-bold tracking-widest mb-1">Architecture Readout</div>
+<div class="font-mono text-[0.75rem] text-on-surface-variant">Depth: 154 Layers | Param: 42.7M</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Engineering Pipeline -->
+<section id="pipeline" class="py-24 px-8 bg-surface">
+<div class="max-w-7xl mx-auto text-center mb-16">
+<h2 class="font-headline text-[1.75rem] font-bold text-on-surface">Engineering Pipeline</h2>
+<div class="h-1 w-20 bg-primary mx-auto mt-4 rounded-full"></div>
+</div>
+<div class="max-w-6xl mx-auto relative">
+<!-- Flow Line -->
+<div class="hidden md:block absolute top-1/2 left-0 w-full h-0.5 bg-gradient-to-r from-transparent via-outline-variant/20 to-transparent -translate-y-1/2 z-0"></div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-8 relative z-10">
+<div class="flex flex-col items-center">
+<div class="w-16 h-16 bg-surface-container-high rounded-full flex items-center justify-center border border-primary/30 mb-6 shadow-[0_0_20px_rgba(0,220,229,0.1)]">
+<span class="text-primary font-bold text-xl">01</span>
+</div>
+<h4 class="font-headline font-bold mb-2">Multi-Scale Patching</h4>
+<p class="text-on-surface-variant text-sm text-center">Resizing paired aerial images and semantic masks with synchronized augmentations for stable supervised training.</p>
+</div>
+<div class="flex flex-col items-center">
+<div class="w-16 h-16 bg-surface-container-high rounded-full flex items-center justify-center border border-primary/30 mb-6 shadow-[0_0_20px_rgba(0,220,229,0.1)]">
+<span class="text-primary font-bold text-xl">02</span>
+</div>
+<h4 class="font-headline font-bold mb-2">Inference Engine</h4>
+<p class="text-on-surface-variant text-sm text-center">Batch-wise semantic labeling using the same PyTorch model served by the FastAPI backend.</p>
+</div>
+<div class="flex flex-col items-center">
+<div class="w-16 h-16 bg-surface-container-high rounded-full flex items-center justify-center border border-primary/30 mb-6 shadow-[0_0_20px_rgba(0,220,229,0.1)]">
+<span class="text-primary font-bold text-xl">03</span>
+</div>
+<h4 class="font-headline font-bold mb-2">Stitch &amp; Reconstruction</h4>
+<p class="text-on-surface-variant text-sm text-center">Alpha-blending reconstructed patches to eliminate border artifacts and normalize spectral consistency.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Optimization & Training -->
+<section id="optimization" class="py-24 px-8 bg-surface-container-low">
+<div class="max-w-7xl mx-auto">
+<div class="mb-12">
+<h2 class="font-headline text-[1.75rem] font-bold text-on-surface">Optimization &amp; Training</h2>
+<p class="text-on-surface-variant mt-2">Precision-tuned hyper-parameters for massive geospatial datasets.</p>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+<div class="group bg-surface-container p-8 rounded-xl border border-transparent hover:border-primary/20 transition-all duration-300">
+<div class="flex justify-between items-start mb-6">
+<div class="w-14 h-14 bg-primary/10 rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined text-primary" data-icon="speed">speed</span>
+</div>
+<span class="text-[0.65rem] font-mono text-tertiary px-2 py-1 bg-tertiary-container rounded">STABLE</span>
+</div>
+<h3 class="font-headline text-xl font-bold mb-4">AdamW + OneCycleLR</h3>
+<p class="text-on-surface-variant text-sm mb-6 leading-relaxed">
+                            Decoupled weight decay combined with super-convergence learning rate scheduling allows for 3x faster training while avoiding sharp local minima during backpropagation.
+                        </p>
+<div class="pt-6 border-t border-outline-variant/10 flex gap-4 text-[0.7rem] uppercase tracking-widest text-on-surface-variant">
+<span>Weight Decay: 0.01</span>
+<span>Max LR: 3e-4</span>
+</div>
+</div>
+<div class="group bg-surface-container p-8 rounded-xl border border-transparent hover:border-tertiary/20 transition-all duration-300">
+<div class="flex justify-between items-start mb-6">
+<div class="w-14 h-14 bg-tertiary/10 rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined text-tertiary" data-icon="analytics">analytics</span>
+</div>
+<span class="text-[0.65rem] font-mono text-primary px-2 py-1 bg-primary-container rounded">ACCURATE</span>
+</div>
+<h3 class="font-headline text-xl font-bold mb-4">Hybrid Loss (Dice + CE)</h3>
+<p class="text-on-surface-variant text-sm mb-6 leading-relaxed">
+                            Balanced supervision using Soft Dice Loss for spatial intersection and Cross Entropy for categorical precision, effectively handling class imbalance in urban vs. rural density.
+                        </p>
+<div class="pt-6 border-t border-outline-variant/10 flex gap-4 text-[0.7rem] uppercase tracking-widest text-on-surface-variant">
+<span>mIoU: 0.912</span>
+<span>F1-Score: 0.894</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Interactive Inference Demo -->
+<section id="demo" class="py-24 px-8 bg-surface">
+<div class="max-w-5xl mx-auto">
+<div class="text-center mb-12">
+<h2 class="font-headline text-[1.75rem] font-bold text-on-surface mb-4">Inference Playground</h2>
+<p class="text-on-surface-variant">Upload an aerial image or video frame to run semantic segmentation through the FastAPI backend.</p>
+</div>
+<div class="bg-surface-container-low rounded-xl overflow-hidden border border-outline-variant/20 shadow-2xl">
+<!-- Upload Zone -->
+<div class="p-12 border-b border-outline-variant/10">
+<div id="dropZone" class="border-2 border-dashed border-primary/30 rounded-xl p-12 text-center hover:bg-primary/5 transition-colors cursor-pointer relative group">
+    <input type="file" id="fileUpload" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-50" accept="image/png, image/jpeg, image/tiff, video/mp4, video/webm">
+    <span class="material-symbols-outlined text-[3rem] text-primary mb-4 block group-hover:scale-110 transition-transform" data-icon="cloud_upload">cloud_upload</span>
+<div class="text-lg font-bold text-on-surface">Drop image or video here to run inference</div>
+    <div class="text-sm text-on-surface-variant mt-2">Support TIFF, JPG, PNG, MP4, WEBM</div>
+</div>
+<!-- Loading State -->
+<div id="loadingState" class="hidden mt-6 text-center">
+    <span class="material-symbols-outlined text-[2rem] text-primary animate-spin inline-block" data-icon="sync">sync</span>
+    <div class="text-sm text-primary mt-2 font-bold uppercase tracking-widest">Processing Image...</div>
+</div>
+</div>
+<!-- Side-by-Side Visualization -->
+<div class="p-8">
+<div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+<div class="space-y-4">
+<div class="text-[0.7rem] uppercase tracking-widest font-bold text-primary">Source Feed</div>
+<div class="aspect-video bg-surface-container rounded-lg overflow-hidden relative border border-outline-variant/10 flex items-center justify-center">
+<img id="sourcePreview" class="w-full h-full object-cover" data-alt="source preview fallback" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCVb-ic0RT8Jp1tweceRyzf3ueTa7-KCo3ub7UT3vi8WSIKRr9DaabiuQHuNZXHgz8OUQpWw8o5UIY8TChbYEcAfaYaRM7me0uPxs89QsOKiiVVtMMi8vq328be5f3WjeWhflsNSrFRzG0OD0EsNfFIjIwysKeHRl_dz3i4AOA8jj8wo03zv01xbLNWj3Oi4U4oAGI_Uk4DcGDPXrzfpTRj3iVYhahVo4u4DpIeiYLLSL-MqwP_1unynyiKNSSiryX8e_bgUFyBQD0"/>
+<video id="sourceVideo" class="w-full h-full object-cover hidden" muted loop autoplay playsinline></video>
+<div class="absolute top-2 left-2 bg-surface/80 backdrop-blur px-2 py-1 rounded text-[0.6rem] font-mono">SENSOR_01: RGB</div>
+</div>
+</div>
+<div class="space-y-4">
+<div class="text-[0.7rem] uppercase tracking-widest font-bold text-tertiary">Semantic Mask</div>
+<div class="aspect-video bg-surface-container rounded-lg overflow-hidden relative border border-outline-variant/10 flex items-center justify-center">
+<div class="absolute inset-0 z-0">
+<img id="maskPreview" class="w-full h-full object-cover" data-alt="mask preview fallback" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAw8XgbF9qcIBMq5w4Gcao-T0Y0eJrsrM93LNkefjDFgjB3roc8Fx2D_86XKMDoOu_sGBIosUHw0CTTmEgKtrUdKbQRlESNCDJIZWn0u0lg8ECOOS2K6hZqcYysnb6rcsOa61LjLtTYVwiluCoBeo0QeFtgEE-3OwcbwtK0NsnQD6u5EnIB6Cdaj0RunHV5WY-xpF3SjV9tIDKh8tdpfbXbAGV-kST2p_9BUE6VCNInqU6TUhlFnBlolU0UyKgVUd8prqYXJ8xN_7Q"/>
+</div>
+<div class="absolute top-2 left-2 bg-surface/80 backdrop-blur px-2 py-1 rounded text-[0.6rem] font-mono text-tertiary">OUTPUT: SEG_MAP</div>
+</div>
+</div>
+</div>
+<!-- Class Chips -->
+<div class="mt-12">
+<div class="text-[0.7rem] uppercase tracking-widest font-bold text-on-surface-variant mb-4">Detected Entities</div>
+<div id="entitiesContainer" class="flex flex-wrap gap-2">
+<span class="px-3 py-1 bg-surface-container-high rounded-[0.125rem] text-[0.75rem] font-medium text-on-surface border-l-2 border-primary">Road / Impervious</span>
+<span class="px-3 py-1 bg-surface-container-high rounded-[0.125rem] text-[0.75rem] font-medium text-on-surface border-l-2 border-secondary">Vegetation</span>
+<span class="px-3 py-1 bg-surface-container-high rounded-[0.125rem] text-[0.75rem] font-medium text-on-surface border-l-2 border-tertiary">Building</span>
+<span class="px-3 py-1 bg-surface-container-high rounded-[0.125rem] text-[0.75rem] font-medium text-on-surface border-l-2 border-error">Land / Other</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="w-full bg-[#0d0e12] border-t border-[#44474c]/20 py-12 mt-20">
+<div class="w-full max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center px-8 gap-6 font-['Inter'] text-[0.75rem] uppercase tracking-[0.1em]">
+<div class="flex flex-col md:flex-row items-center gap-8">
+<div class="text-sm font-bold text-[#00dce5]">AERIAL SEGMENTER</div>
+<div class="text-[#c4c6cc]">© 2026 AERIAL SEGMENTER // INCEPTION_V4_UNET</div>
+</div>
+<div class="flex gap-8">
+<a class="text-[#c4c6cc] hover:text-[#2ae500] transition-colors flex items-center gap-2" href="https://github.com/SaarthakG-Dtu/Aerial-Image-Segmentation" target="_blank" rel="noopener noreferrer">
+<span class="material-symbols-outlined text-sm" data-icon="terminal">terminal</span>
+                    GitHub
+                </a>
+</div>
+</div>
+</footer>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const fileInput = document.getElementById('fileUpload');
+        const dropZone = document.getElementById('dropZone');
+        const sourcePreview = document.getElementById('sourcePreview');
+        const sourceVideo = document.getElementById('sourceVideo');
+        const maskPreview = document.getElementById('maskPreview');
+        const entitiesContainer = document.getElementById('entitiesContainer');
+        const loadingState = document.getElementById('loadingState');
+        let videoInterval = null;
+
+        // Drag and drop handlers
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('border-primary', 'bg-primary/10');
+        });
+        dropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-primary', 'bg-primary/10');
+        });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-primary', 'bg-primary/10');
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                fileInput.files = e.dataTransfer.files;
+                handleFileSelect(e.dataTransfer.files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files && e.target.files.length > 0) {
+                handleFileSelect(e.target.files[0]);
+            }
+        });
+        
+        function handleFileSelect(file) {
+            if (file.type.startsWith('video/')) {
+                handleVideoFile(file);
+            } else {
+                handleImageFile(file);
+            }
+        }
+
+        async function handleImageFile(file) {
+            sourcePreview.classList.remove('hidden');
+            sourceVideo.classList.add('hidden');
+            if(videoInterval) clearInterval(videoInterval);
+
+            // Show preview
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                sourcePreview.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+
+            await sendPredictionRequest(file);
+        }
+
+        function handleVideoFile(file) {
+            sourcePreview.classList.add('hidden');
+            sourceVideo.classList.remove('hidden');
+            
+            const url = URL.createObjectURL(file);
+            sourceVideo.src = url;
+            sourceVideo.play();
+            
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            if(videoInterval) clearInterval(videoInterval);
+            
+            let isProcessing = false;
+            
+            videoInterval = setInterval(() => {
+                if(isProcessing || sourceVideo.paused || sourceVideo.ended) return;
+                
+                // Draw current frame to canvas
+                canvas.width = sourceVideo.videoWidth || 640;
+                canvas.height = sourceVideo.videoHeight || 480;
+                
+                if(canvas.width === 0) return; // Video not loaded yet
+                isProcessing = true;
+                ctx.drawImage(sourceVideo, 0, 0, canvas.width, canvas.height);
+                
+                // Extract blob and predict
+                canvas.toBlob(async (blob) => {
+                    if(!blob) {
+                         isProcessing = false;
+                         return;
+                    }
+                    try {
+                        await sendPredictionRequest(blob, true);
+                    } finally {
+                        isProcessing = false;
+                    }
+                }, 'image/jpeg', 0.8);
+                
+            }, 1000); // 1 FPS for inference
+        }
+
+        async function sendPredictionRequest(fileOrBlob, isVideo = false) {
+            const formData = new FormData();
+            formData.append('file', fileOrBlob, 'upload.jpg');
+            
+            if (!isVideo) {
+                 loadingState.classList.remove('hidden');
+            }
+            
+            try {
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) throw new Error('Prediction failed');
+                
+                const data = await response.json();
+                
+                // Update mask image
+                maskPreview.src = data.mask_base64;
+                
+                // Update entities
+                entitiesContainer.innerHTML = '';
+                data.entities.forEach(entity => {
+                    const chip = document.createElement('span');
+                    chip.className = 'px-3 py-1 bg-surface-container-high rounded-[0.125rem] text-[0.75rem] font-medium text-on-surface border-l-4';
+                    chip.style.borderColor = entity.color;
+                    chip.textContent = `${entity.class_name} (${entity.percentage}%)`;
+                    entitiesContainer.appendChild(chip);
+                });
+            } catch (err) {
+                console.error(err);
+                if (!isVideo) {
+                    alert('Error processing image. Please try again.');
+                }
+            } finally {
+                loadingState.classList.add('hidden');
+            }
+        }
+    });
+</script>
+
+</body></html>

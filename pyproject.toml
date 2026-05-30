@@ -1,0 +1,9 @@
+[project]
+name = "aerial-image-segmentation"
+version = "0.1.0"
+description = "FastAPI-backed aerial semantic segmentation with an Inception-v4 U-Net."
+requires-python = ">=3.10"
+readme = "README.md"
+
+[tool.setuptools]
+packages = ["aerial_segmentation"]
