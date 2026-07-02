@@ -2,11 +2,11 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 
-outputs/*.pt
-outputs/*.pth
-outputs/*.png
-*.pt
-*.pth
+# outputs/*.pt
+# outputs/*.pth
+# outputs/*.png
+# *.pt
+# *.pth
 
 .venv/
 venv/
